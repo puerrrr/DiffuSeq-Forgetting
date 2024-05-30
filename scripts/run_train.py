@@ -23,6 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-04, help='learning rate')
     parser.add_argument('--bsz', type=int, default=64, help='batch size')
     parser.add_argument('--microbatch', type=int, default=64, help='microbatch size')
+    parser.add_argument('--forget_size', type=int, default=100, help='number of samples to forget')
     parser.add_argument('--seed', type=int, default=101, help='random seed')
 
     parser.add_argument('--config_name', type=str, default='bert-base-uncased', help='config of pre-trained models')
@@ -65,6 +66,7 @@ if __name__ == '__main__':
                   f"--dataset {args.dataset} --data_dir {args.data_dir} --vocab {args.vocab} --use_plm_init {args.use_plm_init} " \
                   f"--lr {args.lr} " \
                   f"--batch_size {args.bsz} --microbatch {args.microbatch} " \
+                  f"--forget_size {args.forget_size} " \
                   f"--diffusion_steps {args.diff_steps} " \
                   f"--noise_schedule {args.noise_schedule} " \
                   f"--schedule_sampler {args.schedule_sampler} --resume_checkpoint {args.resume_checkpoint} " \

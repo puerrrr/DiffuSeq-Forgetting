@@ -32,8 +32,10 @@ class TrainLoop:
         self,
         *,
         model,
+        fromzen_model,
         diffusion,
         data,
+        forget_data,
         batch_size,
         microbatch,
         lr,
@@ -52,8 +54,10 @@ class TrainLoop:
         eval_interval=-1,
     ):
         self.model = model
+        self.fromzen_model = fromzen_model
         self.diffusion = diffusion
         self.data = data
+        self.forget_data = forget_data
         self.eval_data = eval_data
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size

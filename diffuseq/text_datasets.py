@@ -1,12 +1,13 @@
 # import blobfile as bf
-import numpy as np
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.data.distributed import DistributedSampler
-
 import torch
 import json
 import psutil
 import datasets
+import os
+import random
+import numpy as np
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.distributed import DistributedSampler
 from datasets import Dataset as Dataset2
 
 def load_data_text(
@@ -164,29 +165,56 @@ def get_corpus(data_args, seq_len, split='train', loaded_vocab=None):
     
     if split == 'train':
         print('### Loading form the TRAIN set...')
-        path = f'{data_args.data_dir}/train.jsonl'
+        data_path = f'{data_args.data_dir}/train.jsonl'
     elif split == 'valid':
         print('### Loading form the VALID set...')
-        path = f'{data_args.data_dir}/valid.jsonl'
+        data_path = f'{data_args.data_dir}/valid.jsonl'
     elif split == 'test':
         print('### Loading form the TEST set...')
-        path = f'{data_args.data_dir}/test.jsonl'
+        data_path = f'{data_args.data_dir}/test.jsonl'
+    elif split == 'forget':
+        print('### Loading form the FORGET set...')
+        data_path = os.path.join(data_args.checkpoint_path, 'forget.jsonl')
+        if not os.path.exists(data_path):
+            print('### Forget set not found, using the training set to sample instead...')
+            train_data_path = f'{data_args.data_dir}/train.jsonl'
+            sentence_lst = sample_and_save_forget_set(train_data_path, data_args.forget_size, data_path)
+            forget_dataset = helper_tokenize(sentence_lst, loaded_vocab, seq_len)
+            return forget_dataset
     else:
         assert False, "invalid split for dataset"
 
-    with open(path, 'r') as f_reader:
+    with open(data_path, 'r') as f_reader:
         for row in f_reader:
             content = json.loads(row)
             sentence_lst['src'].append(content['src'].strip())
             sentence_lst['trg'].append(content['trg'].strip())
 
-    print('### Data samples...\n', sentence_lst['src'][:2], sentence_lst['trg'][:2])
-        
-    # get tokenizer.
-    vocab_dict = loaded_vocab
-
-    train_dataset = helper_tokenize(sentence_lst, vocab_dict, seq_len)
+    train_dataset = helper_tokenize(sentence_lst, loaded_vocab, seq_len)
     return train_dataset
+
+
+def sample_and_save_forget_set(train_data_path, sample_size, save_path):
+    sentence_lst = {'src': [], 'trg': []}
+    all_sentences = []
+
+    with open(train_data_path, 'r') as f_reader:
+        for row in f_reader:
+            content = json.loads(row)
+            all_sentences.append(content)
+
+    sampled_sentences = random.sample(all_sentences, sample_size)
+
+    # save the sampled sentences to checkpoint path
+    with open(save_path, 'w') as f_writer:
+        for content in sampled_sentences:
+            json.dump(content, f_writer)
+            f_writer.write('\n')
+
+    for content in sampled_sentences:
+        sentence_lst['src'].append(content['src'].strip())
+        sentence_lst['trg'].append(content['trg'].strip())
+    return sentence_lst
 
 
 class TextDataset(Dataset):

@@ -580,6 +580,42 @@ class GaussianDiffusion:
 
         return {'pred_xprev':pred_prev, 'pred_xstart':pred_xstart}
 
+    def forgetting_loss_seq2seq(self, model, frozen_model, x_start, t, prev_t, model_kwargs=None, noise=None):
+        """
+        Compute forgetting losses for a single timestep.
+
+        :param model: the model to evaluate loss on.
+        :param frozen_model: the model to calculate the forgetting loss on.
+        :param x_start: the [N x C x ...] tensor of inputs. # not used unless fixing the input embeddings
+        :param t: a batch of timestep indices.
+        :param prev_t: a batch of previous timestep indices.
+        :param model_kwargs: if not None, a dict of extra keyword arguments to
+            pass to the model. This can be used for conditioning.
+        :param noise: if specified, the specific Gaussian noise to try to remove.
+        :return: a dict with the key "loss" containing a tensor of shape [N].
+        """
+        assert 'input_ids' in model_kwargs
+        input_ids_x = model_kwargs.pop('input_ids').to(t.device)
+        input_ids_mask = model_kwargs.pop('input_mask').to(t.device)
+        x_start_mean = model.model.module.get_embeds(input_ids_x)
+        
+        std = _extract_into_tensor(self.sqrt_one_minus_alphas_cumprod,
+                                   th.tensor([0]).to(x_start_mean.device),
+                                   x_start_mean.shape)
+        # print(std.shape, )
+        # x_start_log_var = 2 * th.log(std)
+        x_start = self._get_x_start(x_start_mean, std)
+        # print(x_start_mean.shape, x_start.shape)
+        if noise is None:
+            noise = th.randn_like(x_start)
+
+        x_t = self.q_sample(x_start, t, noise=noise, mask=input_ids_mask) 
+
+        terms = {}
+        model_output = model(x_t, self._scale_timesteps(t), **model_kwargs)
+        frozen_model_output = frozen_model(x_t, self._scale_timesteps(prev_t), **model_kwargs)
+        prev_frozen_model_output = frozen_model(x_start, self._scale_timesteps(prev_t), **model_kwargs)
+        
     def training_losses_seq2seq(self, model, x_start, t, model_kwargs=None, noise=None):
         """
         Compute training losses for a single timestep.
